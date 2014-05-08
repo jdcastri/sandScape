@@ -27,6 +27,11 @@ void testApp::setup(){
     colorImg.allocate(kinect.width, kinect.height, OF_IMAGE_COLOR);
     diffImg.allocate(kinect.width, kinect.height, OF_IMAGE_COLOR);
     grayImage.allocate(kinect.width, kinect.height);
+    grayOverall.allocate(kinect.width, kinect.height);
+    grayOverall.set(254);
+    
+    grayImage_avg.allocate(kinect.width, kinect.height);
+    grayImage_avg.set(1);
     
     startTimeout = ofGetElapsedTimef();
     if(!gradient.loadImage("gradient.png")) {
@@ -57,6 +62,23 @@ void testApp::update(){
         // add effects to smooth signal and reduce noise
         grayImage.blur(3);
         grayImage.dilate();
+
+        
+        //for (int threshold=farThreshold; threshold < nearThreshold; threshold+=1) {
+            grayThreshNear = grayImage;
+            grayThreshFar = grayImage;
+            grayThreshNear.threshold(farThreshold + 2, true);
+            grayThreshFar.threshold(farThreshold + 1);
+            cvAnd(grayThreshNear.getCvImage(), grayThreshFar.getCvImage(), grayImage.getCvImage(), NULL);
+        
+            contourFinder.findContours(grayImage, 20, (340*240)/3, 10, true);
+        
+            //cvAnd(grayImage.getCvImage(), grayOverall.getCvImage(), grayOverall.getCvImage(), NULL);
+       // }
+        
+        //cvAddWeighted(grayImage.getCvImage(), .8, grayImage_avg.getCvImage(), .2, 0.0, grayImage_avg.getCvImage());
+        
+        /*
         
         unsigned char * pix = grayImage.getPixels();
         
@@ -150,6 +172,8 @@ void testApp::update(){
         
         colorImg.update();
         diffImg.update();
+         
+        */
 		// update the cv images
 		grayImage.flagImageChanged();
     }
@@ -159,7 +183,7 @@ void testApp::update(){
 void testApp::draw() {
     
     double multiplier = 2.0;
-    
+    /*
     double width = colorImg.width * multiplier;
     double height = colorImg.height * multiplier;
     
@@ -184,7 +208,14 @@ void testApp::draw() {
     }
     ofPopMatrix();
     ofPopMatrix();
-
+    */
+    //grayOverall.draw(10,10);
+    ofSetColor(255, 0, 0);
+    grayImage.draw(10,10);
+    
+    for (int i = 0; i < contourFinder.nBlobs; i++){
+        contourFinder.blobs[i].draw(10,10);
+    }
 }
 
 //--------------------------------------------------------------

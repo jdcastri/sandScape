@@ -49,8 +49,8 @@ class testApp : public ofBaseApp{
     
     vector<int> contour;
     
-	
-    ofxCvGrayscaleImage grayImage; // grayscale depth image
+    ofxCvGrayscaleImage grayImage, grayImage_avg, grayThreshNear, grayThreshFar, grayOverall; // grayscale depth image
     double prevPix[39149988];
+    ofxCvContourFinder contourFinder;
 		
 };
