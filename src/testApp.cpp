@@ -24,33 +24,31 @@ void testApp::setup(){
 		ofLogNotice() << "zero plane dist: " << kinect.getZeroPlaneDistance() << "mm";
 	}
     
+    // allocate memory in ofImages
     colorImg.allocate(kinect.width, kinect.height, OF_IMAGE_COLOR);
-    diffImg.allocate(kinect.width, kinect.height, OF_IMAGE_COLOR);
     grayImage.allocate(kinect.width, kinect.height);
+    
     grayOverall.allocate(kinect.width, kinect.height);
-    grayOverall.set(254);
+    grayOverall.set(0);
     
     grayImage_avg.allocate(kinect.width, kinect.height);
     grayImage_avg.set(1);
     
+    // get current time
     startTimeout = ofGetElapsedTimef();
+    
+    // load 20x1 pixel image for color gradients
     if(!gradient.loadImage("gradient.png")) {
         ofLog(OF_LOG_ERROR, "Error while loading image");
     }
     
     ofSetFrameRate(60);
     ofSetLogLevel(OF_LOG_VERBOSE);
-	
-	// zero the tilt on startup
-	angle = 0;
-	kinect.setCameraTiltAngle(angle);
 }
 
 //--------------------------------------------------------------
 void testApp::update(){
     ofBackground(0, 0, 0);
-    
-    bool getDiffPixels;
 	
 	kinect.update();
 	
@@ -59,71 +57,52 @@ void testApp::update(){
 		
 		// load grayscale depth image from the kinect source
 		grayImage.setFromPixels(kinect.getDepthPixels(), kinect.width, kinect.height);
+        
         // add effects to smooth signal and reduce noise
-        grayImage.blur(3);
+        grayImage.blur(7);
         grayImage.dilate();
 
         
-        //for (int threshold=farThreshold; threshold < nearThreshold; threshold+=1) {
+        //for (int i=0; i < nearThreshold- farThreshold; i+=1) {
             grayThreshNear = grayImage;
             grayThreshFar = grayImage;
-            grayThreshNear.threshold(farThreshold + 2, true);
+            grayThreshNear.threshold(farThreshold + 1 + 1, true);
             grayThreshFar.threshold(farThreshold + 1);
             cvAnd(grayThreshNear.getCvImage(), grayThreshFar.getCvImage(), grayImage.getCvImage(), NULL);
         
-            contourFinder.findContours(grayImage, 20, (340*240)/3, 10, true);
+            cvAddWeighted(grayImage.getCvImage(), .9, grayImage_avg.getCvImage(), .1, 0.0, grayImage_avg.getCvImage());
+        cvSmooth(grayImage_avg.getCvImage(), grayImage_avg.getCvImage());
         
-            //cvAnd(grayImage.getCvImage(), grayOverall.getCvImage(), grayOverall.getCvImage(), NULL);
-       // }
+            contourFinder.findContours(grayImage_avg, 200, (340*240)/3, 10, true);
+        //}
         
-        //cvAddWeighted(grayImage.getCvImage(), .8, grayImage_avg.getCvImage(), .2, 0.0, grayImage_avg.getCvImage());
+        
+        //cvAnd(grayImage.getCvImage(), grayOverall.getCvImage(), grayOverall.getCvImage(), NULL);
+        
+        
         
         /*
+         * Edit data through pixel manipulation
+         */
         
+        /*
         unsigned char * pix = grayImage.getPixels();
-        
-        if (ofGetFrameNum() == 1) {
-            int size = 39149988;
-            for (int i=0; i<size; i++) {
-                prevPix[i] = 100;
-            }
-        }
-        
-        // find mode
-        double playModeHeight = pix[playModeCoords[1] * int(grayImage.getWidth()) + playModeCoords[0]];
-        double diffModeHeight = pix[diffModeCoords[1] * int(grayImage.getWidth()) + diffModeCoords[0]];
-       
-        if (playModeHeight >= 200 && mode!="play") {
-            if (ofGetFrameNum() == prevFrameCount + frameThreshold) {
-                mode = "play";
-            } else if (ofGetFrameNum() > prevFrameCount + frameThreshold){
-                prevFrameCount = ofGetFrameNum();
-            }
-        }
-        
-        else if (diffModeHeight >= 200 && mode!="diff") {
-            if (ofGetFrameNum() == prevFrameCount + frameThreshold) {
-                //mode = "diff";
-                getDiffPixels = true;
-            } else if (ofGetFrameNum() > prevFrameCount + frameThreshold){
-                prevFrameCount = ofGetFrameNum();
-            }
-        }
 
         // draw image
         int diffThreshold = nearThreshold - farThreshold;
+        
+        // iterate through pixel data
         for(int w = 0; w < grayImage.getWidth(); w++) {
             for(int h=0; h < grayImage.getHeight(); h++) {
+                
                 // average previous pixels with current reading
                 int index = h * int(grayImage.getWidth()) + w;
                 double currentDepth = pix[index];
                 double prevDepth = prevPix[index];
-                prevPix[index] = prevDepth* .8 + currentDepth * .2;
+                prevPix[index] = prevDepth* .90 + currentDepth * .1;
                 double  depth = prevPix[index];
                 
-                if (getDiffPixels) {
-                    diffPixels[w][h] = depth;
-                }
+                // boolean operations if inside sandbox boundaries and depth boundaries
                 bool isInBoundary = w<xRightBoundary && w>xLeftBoundary && h<yBottomBoundary && h>yTopBoundary;
                 bool isInDepthBoundary = currentDepth < nearThreshold && currentDepth > farThreshold;
                 
@@ -139,41 +118,22 @@ void testApp::update(){
                 if (ofGetElapsedTimef() == startTimeout + timeout) {
                     isTimeout = true;
                 }
+                
+                // set pixels of colorImg based on depth ratio
                 if( isInDepthBoundary && isInBoundary && !isTimeout) {
-                    
-                    // play mode
-                    if (mode == "play") {
-                        double diffToThreshold = depth - farThreshold;
-                        double ratioInDepth = diffToThreshold/diffThreshold;
+                    double diffToThreshold = depth - farThreshold;
+                    double ratioInDepth = diffToThreshold/diffThreshold;
                         
-                        ofColor color = gradient.getColor(floor(ratioInDepth * 20), 0);
-                        colorImg.setColor(w,h, color);
-                    }
-                    else if (mode == "diff" && diffPixels[0]>=0){
-                        double diffPixel = diffPixels[w][h];
-                        int saturation = 50+(diffPixel - depth) /4. * 255.;
-                        ofColor gradient = ofColor::white;
-                        if (saturation>0) {
-                            gradient = ofColor::fromHsb(255*2/3, saturation, 255);
-                        }
-                        else if (saturation<0) {
-                            gradient = ofColor::fromHsb(0,-saturation,255);
-                        }
-                        diffImg.setColor(w,h, gradient);
-                    }
-                    
-                } else {
-                    colorImg.setColor(w,h, ofColor::black);
-                    diffImg.setColor(w,h, ofColor::black);
-                }	
+                    ofColor color = gradient.getColor(floor(ratioInDepth * 20), 0);
+                    colorImg.setColor(w,h, color);
+                }
+
             }
         }
-        getDiffPixels = false;
         
         colorImg.update();
-        diffImg.update();
-         
-        */
+         */
+        
 		// update the cv images
 		grayImage.flagImageChanged();
     }
@@ -182,6 +142,7 @@ void testApp::update(){
 //--------------------------------------------------------------
 void testApp::draw() {
     
+    // enlarge image by multiplier
     double multiplier = 2.0;
     /*
     double width = colorImg.width * multiplier;
@@ -200,22 +161,19 @@ void testApp::draw() {
     //Additional translation to fit projection
     ofTranslate(-63, -39);
     
-
-    if (mode=="diff") {
-        diffImg.draw(0,0, width, height);
-    } else {
         colorImg.draw(0, 0, width, height);
-    }
     ofPopMatrix();
     ofPopMatrix();
+    
     */
-    //grayOverall.draw(10,10);
+    //grayImage_avg.draw(10,10);
     ofSetColor(255, 0, 0);
-    grayImage.draw(10,10);
+
     
     for (int i = 0; i < contourFinder.nBlobs; i++){
         contourFinder.blobs[i].draw(10,10);
     }
+     
 }
 
 //--------------------------------------------------------------

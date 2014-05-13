@@ -24,32 +24,25 @@ class testApp : public ofBaseApp{
     
         ofxKinect kinect;
     
+    // depth boundaries
     int nearThreshold = 202;
 	int farThreshold = 191;
     
+    // pixel boundaries of sand
     int xLeftBoundary = 240;
     int xRightBoundary = 456;
     int yTopBoundary = 98;
     int yBottomBoundary = 313;
     
-    int startTimeout; //seconds
+    // setting the screen black after <timeout> seconds
     float timeout = 60; //seconds
+    int startTimeout; //seconds
     bool isTimeout = false;
-    string mode = "none";
     
-    int playModeCoords [2] = {500,280};
-    int diffModeCoords [2] = {500,200};
-    double diffPixels[640][640];
-	
-    int angle;
-    int prevFrameCount=0;
-    int frameThreshold=20;
-    
-    ofImage colorImg, diffImg, gradient;
-    
-    vector<int> contour;
+    ofImage colorImg, gradient;
     
     ofxCvGrayscaleImage grayImage, grayImage_avg, grayThreshNear, grayThreshFar, grayOverall; // grayscale depth image
+    // array to take  averages
     double prevPix[39149988];
     ofxCvContourFinder contourFinder;
 		
